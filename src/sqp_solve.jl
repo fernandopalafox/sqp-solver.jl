@@ -3,9 +3,11 @@ using LinearAlgebra: norm
 
 function sqp_solve()
     # Set initial iterates
+    counter = 0
     x_k = x_0
     λ_k = λ_0 
-    println("\nx_0 = ", x_0)
+    # println("x_",counter," = ", x_k)
+    # println("λ_",counter," = ", λ_k)
 
     # Preallocate 
     length_x     = length(x_0)
@@ -31,7 +33,12 @@ function sqp_solve()
     tape_c_comp = compile(tape_c)
     tape_L_comp = compile(tape_L)
 
-    for i ∈ 1:100
+    ϕ = 100.0
+    while ϕ > 1e-14
+        # Print 
+        println("x_",counter," = ", x_k, " λ = ", λ_k )
+        # println("λ_",counter," = ", λ_k)
+
         # Evaluate gradient of objective function  
         gradient!(grad_f,tape_f_comp,x_k)
 
@@ -45,7 +52,10 @@ function sqp_solve()
         # Evaluate contraint jacobian
         jacobian!(A,tape_c_comp,x_k)
 
-        # Solve for Newton step 
+        # Evaluate merit function 
+        ϕ = norm([grad_f - A'*λ_k;c])
+
+        # # Solve for Newton step 
         p = inv([hessian_L_xx -A';A zero_mat])*[-grad_f + A'*λ_k; -c]
         p_x_k = p[1:length_x]
         p_λ_k = p[length_x+1:end]
@@ -54,13 +64,19 @@ function sqp_solve()
         x_k = x_k + p_x_k
         λ_k = λ_k + p_λ_k
 
-        # Check merit function 
-        # phi = norm([grad_f - A'*λ_k;eval_c(x_k)])
+        # Try other method instead
+        # p_p = inv([hessian_L_xx -A';A zero_mat])*[-grad_f; -c]
+        # x_k = x_k + p_p[1:length_x]
+        # λ_k = p_p[length_x+1:end]
 
         # Print
-        println("   p_x_",i," = ", p_x_k)
-        println("   p_λ_",i," = ", p_λ_k)
-        println("x_",i," = ", x_k)
+        # println("   p_x_",counter," = ", p_x_k)
+        # println("   p_λ_",counter," = ", p_λ_k)
+        # println("   ϕ_",counter," = ", ϕ)
+        # println("   KKT_",counter," = ", [grad_f - A'*λ_k;eval_c(x_k)])
+
+        counter = counter + 1
     end
+    println("x_",counter," = ", x_k, " λ = ", λ_k )
     return(x_k)
 end
