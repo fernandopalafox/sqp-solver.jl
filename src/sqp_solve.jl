@@ -55,19 +55,19 @@ function sqp_solve()
         # Evaluate merit function 
         ϕ = norm([grad_f - A'*λ_k;c])
 
-        # # Solve for Newton step 
-        p = inv([hessian_L_xx -A';A zero_mat])*[-grad_f + A'*λ_k; -c]
-        p_x_k = p[1:length_x]
-        p_λ_k = p[length_x+1:end]
-
-        # Set new iterates
-        x_k = x_k + p_x_k
-        λ_k = λ_k + p_λ_k
-
         # Try other method instead
-        # p_p = inv([hessian_L_xx -A';A zero_mat])*[-grad_f; -c]
-        # x_k = x_k + p_p[1:length_x]
-        # λ_k = p_p[length_x+1:end]
+        p_p = inv([hessian_L_xx -A';A zero_mat])*[-grad_f; -c]
+        x_k = x_k + p_p[1:length_x]
+        λ_k = p_p[length_x+1:end]
+
+        # # # Solve for Newton step 
+        # p = inv([hessian_L_xx -A';A zero_mat])*[-grad_f + A'*λ_k; -c]
+        # p_x_k = p[1:length_x]
+        # p_λ_k = p[length_x+1:end]
+
+        # # Set new iterates
+        # x_k = x_k + p_x_k
+        # λ_k = λ_k + p_λ_k
 
         # Print
         # println("   p_x_",counter," = ", p_x_k)
