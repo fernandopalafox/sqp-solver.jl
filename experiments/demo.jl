@@ -19,7 +19,7 @@ x_0 = [-1.5,-1.6]
 x_star_actual = [-0.816, -1.155]
 
 # Run problem 
-x_star = sqp_solve()
+x_star = sqp_solve(eval_f,eval_c,x_0,λ_0)
 
 println("c(x) = ",eval_c(x_star))
 println("Δx =  ",x_star - x_star_actual)

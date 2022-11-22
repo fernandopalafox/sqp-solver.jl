@@ -1,7 +1,7 @@
 using ReverseDiff: GradientTape, JacobianTape, HessianTape, compile, gradient!, jacobian!, hessian!
 using LinearAlgebra: norm
 
-function sqp_solve()
+function sqp_solve(eval_f,eval_c,x_0,λ_0)
     # Set initial iterates
     counter = 0
     x_k = x_0
