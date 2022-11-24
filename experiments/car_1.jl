@@ -1,10 +1,10 @@
 using LinearAlgebra: norm
-using Plots
+using Plots;
 
 # z defined as z = [x_{0:T},u(0:T)]
 
-T = 2 # Number of states after initial state 
-Δt = 0.1 # Time step
+T = 10 # Number of states after initial state 
+Δt = 0.01 # Time step
 
 x_0 = [0.0,0.0,0.0,0.0] # Initial state
 x_f = [5.0,0.0,0.0,0.0] # Final state
@@ -27,25 +27,27 @@ end
 # Equality constraints
 function eval_c(z)
     c = Vector{eltype(z)}(undef,ns*(T) + ns)
+    x = Vector{eltype(z)}(undef,ns*T)
+    u = Vector{eltype(z)}(undef,nu*T)
 
-    # Dynamics constraint
-    c[1] = z[1] - x_0[4]*cos(x_0[3])*Δt
-    c[2] = z[2] - x_0[4]*sin(x_0[3])*Δt
-    c[3] = z[3] - z[ns*(T) + 1]*Δt
-    c[4] = z[4] - z[ns*(T) + 2]*Δt
+    # Breakout variables
+    x = z[1:ns*T]
+    u = z[ns*T + 1:end]
+
+    # Dynamics constraints
+    c[1] = x[1] - x_0[4]*cos(x_0[3])*Δt
+    c[2] = x[2] - x_0[4]*sin(x_0[3])*Δt
+    c[3] = x[3] - u[1]*Δt
+    c[4] = x[4] - u[2]*Δt
     for i ∈ 2:T
-        c[ns*(i-1) + 1] = z[ns*(i-1) + 1] - z[ns*(i-2) + 4]*cos(z[ns*(i-2) + 3])*Δt
-        c[ns*(i-1) + 2] = z[ns*(i-1) + 2] - z[ns*(i-2) + 4]*sin(z[ns*(i-2) + 3])*Δt
-        c[ns*(i-1) + 3] = z[ns*(i-1) + 3] - z[ns*(T) + nu*(i-1) + 1]*Δt
-        c[ns*(i-1) + 4] = z[ns*(i-1) + 4] - z[ns*(T) + nu*(i-1) + 2]*Δt
-
-        # println("control t = ",z[ns*(T) + nu*(i-1) + 1])
-        # println("control v = ",z[ns*(T) + nu*(i-1) + 2])
+        c[ns*(i-1) + 1] = x[ns*(i-1) + 1] - x[ns*(i-2) + 4]*cos(x[ns*(i-2) + 3])*Δt
+        c[ns*(i-1) + 2] = x[ns*(i-1) + 2] - x[ns*(i-2) + 4]*sin(x[ns*(i-2) + 3])*Δt
+        c[ns*(i-1) + 3] = x[ns*(i-1) + 3] - u[nu*(i-1) + 1]*Δt
+        c[ns*(i-1) + 4] = x[ns*(i-1) + 4] - u[nu*(i-1) + 2]*Δt
     end
 
     # Final state constraint
-    # println("final state = ",z[ns*(T-1) + 1:ns*(T-1) + ns])
-    c[ns*(T) + 1:ns*(T) + ns] = z[ns*(T-1) + 1:ns*(T-1) + ns] - x_f 
+    c[ns*(T) + 1:end] = x[ns*(T-1) + 1:end] - x_f
 
     # display(c)
     return(c)
@@ -54,9 +56,11 @@ end
 # Solve
 z_star = sqp_solve(eval_f,eval_c,z_0,λ_0);
 
-# Wrap angles
-z_star[3:ns:ns*T] = z_star[3:ns:ns*T].%(2*pi)
-z_star[ns*(T) + 1:nu:end] = z_star[ns*(T) + 1:nu:end].%(2*pi)
+println("z_star = ",z_star)
+
+# Wrap and round angles
+z_star[3:ns:ns*T] = round.(z_star[3:ns:ns*T], digits = 1).%(2*pi)
+# z_star[ns*(T) + 1:nu:end] = round.(z_star[ns*(T) + 1:nu:end], digits = 1).%(2*pi)
 
 z_traj = [x_0;z_star[1:ns*(T)]]
 x_star = z_star[ns*(T-1) + 1:ns*(T-1) + ns]
@@ -70,4 +74,14 @@ println("f_star = ", eval_f(z_star))
 
 # Plot state trajectory
 t = 0:Δt:T*Δt
-plot(t,[z_traj[1:ns:end],z_traj[2:ns:end],z_traj[3:ns:end],z_traj[4:ns:end]],xlabel = ["" "" "" "time [s]"], ylabel = ["x" "y" "θ" "v"], legend = false , layout = (4,1))
+p1 = plot(t,[z_traj[1:ns:end],z_traj[2:ns:end],z_traj[3:ns:end],z_traj[4:ns:end]],
+     ylabel = ["x" "y" "θ" "v"], xlims = [t[1],t[end]], xticks = t, legend = false , layout = (4,1))
+
+# Plot control trajectory
+p2 = bar(t[1:end-1].+Δt/2,[u_star[1:nu:end],u_star[2:nu:end]],
+     xlabel = ["" "time [s]"], ylabel = ["u1" "u2"], 
+     xlims = [t[1],t[end]], xticks = t, legend = false , layout = (2,1))
+
+plt = plot(p1,p2,layout=(2,1),size = (700,1000))
+
+display(plt)
