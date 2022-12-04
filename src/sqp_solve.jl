@@ -1,13 +1,13 @@
 using ReverseDiff: GradientTape, JacobianTape, HessianTape, compile, gradient!, jacobian!, hessian!
-using LinearAlgebra: norm
+using LinearAlgebra: norm, rank, eigvals
 
 function sqp_solve(eval_f,eval_c,x_0,λ_0)
     # Set initial iterates
     counter = 0
     x_k = x_0
     λ_k = λ_0 
-    println("x_",counter," = ", x_k)
-    println("λ_",counter," = ", λ_k)
+    # println("x_",counter," = ", x_k)
+    # println("λ_",counter," = ", λ_k)
 
     # Preallocate 
     length_x     = length(x_0)
@@ -34,7 +34,7 @@ function sqp_solve(eval_f,eval_c,x_0,λ_0)
     tape_L_comp = compile(tape_L)
 
     ϕ = 100.0
-    while ϕ > 1e-14
+    while ϕ > 1e-13
         # Print 
         # println("x_",counter," = ", x_k, " λ_",counter, " = ", λ_k )
         # println("λ_",counter," = ", λ_k)
@@ -47,20 +47,32 @@ function sqp_solve(eval_f,eval_c,x_0,λ_0)
         # Evaluate Hessian of Lagrangian (only at x)
         hessian!(hessian_L,tape_L_comp,[x_k;λ_k])
         hessian_L_xx = hessian_L[1:length_x,1:length_x]
+        # display(hessian_L)
 
         # Evaluate constraints
         c = eval_c(x_k)
 
         # Evaluate contraint jacobian
         jacobian!(A,tape_c_comp,x_k)
+        # println("   size(A) =, ",size(A)," row rank(A) = ", rank(A'))
         # display(A)
 
         # Evaluate merit function 
-        ϕ = norm([grad_f - A'*λ_k;c])
+        # println(counter, " A'")
+        # display(A')
+        # println(counter, " lambda")
+        # display(λ_k)
+        ϕ = norm([grad_f - A'*λ_k;c])^2
 
         # Try other method instead
         # display(hessian_L_xx)
-        p_p = inv([hessian_L_xx -A';A zero_mat])*[-grad_f; -c]
+        # display([hessian_L_xx A';A zero_mat])
+        # println(counter,": rank of ",size([hessian_L_xx -A';A zero_mat])," inverted matrix = ", rank([hessian_L_xx -A';A zero_mat]))
+        # println(counter," svd :", minimum(eigvals(hessian_L_xx))," ",maximum(eigvals(hessian_L_xx)))
+        # println(counter," svs: ", minimum(abs.(eigvals([hessian_L_xx A';A zero_mat])))," ",maximum(abs.(eigvals([hessian_L_xx A';A zero_mat]))))
+        # println(counter," svs = ", eigvals([hessian_L_xx A';A zero_mat]))
+        # display([hessian_L_xx A';A zero_mat])
+        p_p = ([hessian_L_xx -A';A zero_mat])\[-grad_f; -c]
         x_k = x_k + p_p[1:length_x]
         λ_k = p_p[length_x+1:end]
 
