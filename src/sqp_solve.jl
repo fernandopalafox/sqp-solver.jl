@@ -1,7 +1,7 @@
 using ReverseDiff: GradientTape, JacobianTape, HessianTape, compile, gradient!, jacobian!, hessian!
 using LinearAlgebra: norm, rank, eigvals
 
-function sqp_solve(eval_f,eval_c,x_0,λ_0)
+function sqp_solve(eval_f,eval_c,x_0,λ_0; ϕ_min = 1e-13, counter_max = 100000)
     # Set initial iterates
     counter = 0
     x_k = x_0
@@ -34,7 +34,7 @@ function sqp_solve(eval_f,eval_c,x_0,λ_0)
     tape_L_comp = compile(tape_L)
 
     ϕ = 100.0
-    while ϕ > 1e-13
+    while ϕ > ϕ_min && counter < counter_max
         # Print 
         # println("x_",counter," = ", x_k, " λ_",counter, " = ", λ_k )
         # println("λ_",counter," = ", λ_k)
@@ -72,18 +72,18 @@ function sqp_solve(eval_f,eval_c,x_0,λ_0)
         # println(counter," svs: ", minimum(abs.(eigvals([hessian_L_xx A';A zero_mat])))," ",maximum(abs.(eigvals([hessian_L_xx A';A zero_mat]))))
         # println(counter," svs = ", eigvals([hessian_L_xx A';A zero_mat]))
         # display([hessian_L_xx A';A zero_mat])
-        p_p = ([hessian_L_xx -A';A zero_mat])\[-grad_f; -c]
-        x_k = x_k + p_p[1:length_x]
-        λ_k = p_p[length_x+1:end]
+        # p_p = ([hessian_L_xx -A';A zero_mat])\[-grad_f; -c]
+        # x_k = x_k + p_p[1:length_x]
+        # λ_k = p_p[length_x+1:end]
 
-        # # # Solve for Newton step 
-        # p = inv([hessian_L_xx -A';A zero_mat])*[-grad_f + A'*λ_k; -c]
-        # p_x_k = p[1:length_x]
-        # p_λ_k = p[length_x+1:end]
+        # # Solve for Newton step 
+        p = [hessian_L_xx -A';A zero_mat]\[-grad_f + A'*λ_k; -c]
+        p_x_k = p[1:length_x]
+        p_λ_k = p[length_x+1:end]
 
-        # # Set new iterates
-        # x_k = x_k + p_x_k
-        # λ_k = λ_k + p_λ_k
+        # Set new iterates
+        x_k = x_k + 0.5*p_x_k
+        λ_k = λ_k + 0.5*p_λ_k
 
         # Print
         # println("   p_x_",counter," = ", p_x_k)
