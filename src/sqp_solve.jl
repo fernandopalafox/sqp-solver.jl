@@ -55,7 +55,7 @@ function sqp_solve(eval_f,eval_c,x_0,λ_0; ϕ_min = 1e-13, counter_max = 100000)
         # Evaluate contraint jacobian
         jacobian!(A,tape_c_comp,x_k)
         # println("   size(A) =, ",size(A)," row rank(A) = ", rank(A'))
-        # display(A)
+        display(A)
 
         # Evaluate merit function 
         # println(counter, " A'")

@@ -1,39 +1,30 @@
 using LinearAlgebra: norm
 using Plots;
-include("../src/sqp_solve.jl")
+include("../src/sqp_solve_ineq.jl")
 
 # z defined as z = [x_{0:T},u(0:T)]
 
-T = 100 # Number of states after initial state 
-Δt = 0.1 # Time step
+T = 7 # Number of states after initial state 
+Δt = 1 # Time step
 
 x_0 = [0.0,0.0,0.0,0.0] # Initial state
 x_f = [0,5.0,pi,0.0] # Final state
-T=2
-x0 = [1, 1, pi, 0]
-xf = [0, 0, pi, 0]
-# x_f = [1.0,0.0,3*pi/2,0.0]
 ns = length(x_0) # Number of states
 nu = 2 # Number of controls
 
 z_0 = [ones(ns*T);ones(nu*T)] # Initial guess
-# λ_0 = rand(ns + ns*T + ns) # Initial guess for Lagrange multipliers
-λ_0 = ones(ns*T + ns) # Initial guess for Lagrange multipliers
+z_o = [zeros(ns*T);zeros(nu*T)]
+λ_0 = ones(ns*T + ns + T) # Initial guess for Lagrange multipliers
 
 # Objective function 
-# function eval_f(z)
-#     return norm(x_f - z[ns*(T) + 1:ns*(T) + ns]) + norm(z[ns*(T+1) + 1:end])
-# end
 function eval_f(z)
-    # println("Cost function controls: ", z[ns*(T) + 1:end])
+    u = Vector{eltype(z)}(undef,nu*T)
     u = z[ns*T + 1:end]
-    # display(u)
-    # return norm(z[ns*(T) + 1:end])^2
     return sum(u.^2)
 end
 
 # Equality constraints
-function eval_c(z)
+function eval_c_e(z)
     c = Vector{eltype(z)}(undef,ns*(T) + ns)
     x = Vector{eltype(z)}(undef,ns*T)
     u = Vector{eltype(z)}(undef,nu*T)
@@ -61,10 +52,22 @@ function eval_c(z)
     return(c)
 end
 
-# Solve
-z_star = sqp_solve(eval_f,eval_c,z_0,λ_0);
+# Inequality Constraints
+function eval_c_i(z)
+    x = Vector{eltype(z)}(undef,ns*T)
 
-# println("z_star = ",z_star)
+    # Breakout variables
+    x = z[1:ns*T]
+
+    # Wall constraint
+    c = -x[1:ns:ns*T] .+ 1.0
+
+    return(c)
+end
+
+
+# Solve
+z_star = sqp_solve_ineq(eval_f,eval_c_e,eval_c_i,z_0,λ_0)
 
 # Wrap and round angles
 z_star[3:ns:ns*T] = round.(z_star[3:ns:ns*T], digits = 1).%(2*pi)
@@ -80,7 +83,9 @@ u_star = z_star[ns*(T) + 1:end]
 println("f_0 = ", eval_f(z_0))
 println("f_star = ", eval_f(z_star))
 
-# # Plot state trajectory
+## 
+
+# Plot state trajectory
 t = 0:Δt:T*Δt
 # p1 = plot(t,[z_traj[1:ns:end],z_traj[2:ns:end],z_traj[3:ns:end],z_traj[4:ns:end]],
 #      ylabel = ["x" "y" "θ" "v"], xlims = [t[1],t[end]], legend = false , layout = (4,1))
@@ -90,39 +95,33 @@ t = 0:Δt:T*Δt
 #      xlabel = ["" "time [s]"], ylabel = ["u1" "u2"], 
 #      xlims = [t[1],t[end]], legend = false , layout = (2,1))
 
-# plt_vc = plot(p1,p2,layout=(2,1),size = (750,1000))
-
-# display(plt_vc)
-
-# # Plot xy trajectory
-# plt_traj = plot(z_traj[1:ns:end],z_traj[2:ns:end],xlabel = "x", ylabel = "y", legend = false)
-# display(plt_traj)
+# plt_vc = plot(p1,p2,layout=(2,1, heights = [2/5, 2/5, 2/5, 2/5, 2/5]),size = (750,750))
 
 y_ticks_px = round.(minimum(z_traj[1:ns:end]):(maximum(z_traj[1:ns:end]) - minimum(z_traj[1:ns:end]))/2:maximum(z_traj[1:ns:end]),digits = 1)
 y_ticks_py = round.(minimum(z_traj[2:ns:end]):(maximum(z_traj[2:ns:end]) - minimum(z_traj[2:ns:end]))/2:maximum(z_traj[2:ns:end]),digits = 1)
 y_ticks_pt = round.(minimum(z_traj[3:ns:end]):(maximum(z_traj[3:ns:end]) - minimum(z_traj[3:ns:end]))/2:maximum(z_traj[3:ns:end]),digits = 1)
-y_ticks_pv = round.(minimum(z_traj[4:ns:end]):(maximum(z_traj[4:ns:end]) - minimum(z_traj[4:ns:end]))/2:maximum(z_traj[4:ns:end]),digits = 1)
-y_ticks_pu1 = [0.0,0.2,0.4]
-y_ticks_pu2 = [-0.3,0.0,0.3]
+y_ticks_pv = round.(minimum(z_traj[4:ns:end]):(maximum(z_traj[4:ns:end]) - minimum(z_traj[4:ns:end]))/2:maximum(z_traj[4:ns:end])+0.6,digits = 1)
+y_ticks_pu1 = [0.0,0.4,0.7]
+y_ticks_pu2 = [-0.6,0.0,0.6]
 
-px = plot(t,z_traj[1:ns:end], xlims = [t[1],t[end]],label = "x",lw = 3, yticks = y_ticks_px)
-py = plot(t,z_traj[2:ns:end], xlims = [t[1],t[end]],label = "y",lw = 3, yticks = y_ticks_py)
-pt = plot(t,z_traj[3:ns:end], xlims = [t[1],t[end]],label = "Θ",lw = 3, yticks = y_ticks_pt)
-pv = plot(t,z_traj[4:ns:end], xlims = [t[1],t[end]],label = "v",lw = 3, yticks = y_ticks_pv, ylim = [y_ticks_pv[1], y_ticks_pv[3]])
-pu1 = bar(t[1:end-1].+Δt/2,u_star[1:nu:end], xlims = [t[1],t[end]], ylim = [y_ticks_pu1[1], y_ticks_pu1[3]], yticks = y_ticks_pu1, label = "u1")
-pu2 = bar(t[1:end-1].+Δt/2,u_star[2:nu:end], xlims = [t[1],t[end]], yticks = y_ticks_pu2, ylim = [y_ticks_pu2[1], y_ticks_pu1[3] - 0.1], label = "u2", xlabel = "time [s]")
+px = plot(t,z_traj[1:ns:end], xlims = [t[1],t[end]],label = "x",lw = 3, yticks = y_ticks_px,color = 2)
+py = plot(t,z_traj[2:ns:end], xlims = [t[1],t[end]],label = "y",lw = 3, yticks = y_ticks_py,color = 2)
+pt = plot(t,z_traj[3:ns:end], xlims = [t[1],t[end]],label = "Θ",lw = 3, yticks = y_ticks_pt,color = 2)
+pv = plot(t,z_traj[4:ns:end], xlims = [t[1],t[end]],label = "v",lw = 3, yticks = y_ticks_pv, ylim = [y_ticks_pv[1], y_ticks_pv[3]+0.1],color = 2)
+pu1 = bar(t[1:end-1].+Δt/2,u_star[1:nu:end], xlims = [t[1],t[end]], ylim = [y_ticks_pu1[1], y_ticks_pu1[3]], yticks = y_ticks_pu1, label = "u1",color = 2)
+pu2 = bar(t[1:end-1].+Δt/2,u_star[2:nu:end], xlims = [t[1],t[end]], yticks = y_ticks_pu2, ylim = [y_ticks_pu2[1], y_ticks_pu1[3]-0.1], label = "u2", xlabel = "time [s]",color = 2)
 p_z = plot(px,py,pt,pv,pu1,pu2,layout=(6,1),size = (0.8*750,750),
 xtickfont=font("Computer Modern", 12), 
 ytickfont=font("Computer Modern",12), 
 xguidefont=font("Computer Modern",15), 
 legendfont=font("Computer Modern",12),
 fmt = :png)
-display(p_z)
+display(p_z,)
 
-savefig(p_z, "figures/car_1_z.png")
+savefig(p_z, "figures/car_2_z.png")
 
 # Plot xy trajectory
-p_xy = plot(z_traj[1:ns:end],z_traj[2:ns:end],xlabel = "x", ylabel = "y", 
+p_xy = plot([z_traj_1[1:ns:end],z_traj[1:ns:end]],[z_traj_1[2:ns:end],z_traj[2:ns:end]],xlabel = "x", ylabel = "y", labels = ["P1" "P2"],
 lw = 3,
 xlim = [0,1.5],
 xtickfont=font("Computer Modern", 12), 
@@ -130,10 +129,7 @@ ytickfont=font("Computer Modern",12),
 xguidefont=font("Computer Modern",15),
 yguidefont=font("Computer Modern",15), 
 legendfont=font("Computer Modern",12),
-legend = false,
 size = (350,350))
 display(p_xy)
 
-savefig(p_xy, "figures/car_1_xy.png")
-
-z_traj_1 = z_traj
+savefig(p_xy, "figures/car_2_xy.png")
